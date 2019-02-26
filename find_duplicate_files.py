@@ -13,13 +13,14 @@ def parse_input():
                         help=argparse.SUPPRESS)
     options = parser.add_argument_group('Options')
     options.add_argument('-p', '--path', nargs=1, type=str,
-                         help='accepts one mandatory argument that identifies the root directory to start scanning for duplicate files')
+                         help='accepts one mandatory argument that identifies '
+                              'the root directory to start scanning for duplicate files')
     return parser.parse_args()
 
 
 def scan_files(path):
     files = []
-    for dirpath, _, filenames in os.walk(path, followlinks=False):
+    for dirpath, _, filenames in os.walk(path):
         for f in filenames:
             files.append(os.path.abspath(os.path.join(dirpath, f)))
     return files
@@ -66,3 +67,4 @@ def find_duplicate_files(file_path_names):
             if len(gr_by_checksum) > 1:
                 groups_dup_files.append(gr_by_checksum)
     return json.dumps(groups_dup_files)
+
