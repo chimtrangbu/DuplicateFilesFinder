@@ -4,61 +4,73 @@
 import argparse
 import hashlib
 import json
-import os
+from os import path, walk
 
 
 def parse_input():
     parser = argparse.ArgumentParser()
-    parser.add_argument('N', nargs='?', type=str,
-                        help=argparse.SUPPRESS)
-    options = parser.add_argument_group('Options')
-    options.add_argument('-p', '--path', nargs=1, type=str,
-                         help='accepts one mandatory argument that identifies '
-                              'the root directory to start scanning for duplicate files')
-    return parser.parse_args()
+    # Waypoint 1:
+    parser.add_argument('-p', '--path', type=str, required=True,
+                         help='accepts one mandatory argument that '
+                              'identifies the root directory to start '
+                              'scanning for duplicate files')
+    args = parser.parse_args()
+    if not path.isdir(args.path):
+        parser.print_help()
+        exit(1)
+    return args
 
 
-def scan_files(path):
+def scan_files(path_dir):  # Waypoint 2
     files = []
-    for dirpath, _, filenames in os.walk(path):
+    for dirpath, _, filenames in walk(path_dir):
         for f in filenames:
-            files.append(os.path.abspath(os.path.join(dirpath, f)))
+            path_file = path.abspath(path.join(dirpath, f))
+            if not path.islink(path_file):  # ignore symbolic links
+                files.append(path_file)
     return files
 
 
-def group_files_by_size(file_path_names):
+def group_files_by_size(file_path_names):  # Waypoint 3
     groups = {}
-    for filename in file_path_names:
-        size = os.path.getsize(filename)
+    for filename in file_path_names:  # create the same-size-groups
+        size = path.getsize(filename)
         if size == 0:
-            continue
+            continue  # ignore empty files
         if size in groups.keys():
             groups[size].append(filename)
         else:
             groups[size] = [filename]
-    return list(groups.values())
+    return [group for group in groups.values()
+            if len(group) > 1]  # ignore if group has only 1 file
 
 
-def get_file_checksum(file_path):
+def get_file_checksum(file_path):  # Waypoint 4
     hash_md5 = hashlib.md5()
-    with open(file_path, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
+    try:
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash_md5.update(chunk)
+    except FileNotFoundError:
+        return None
     return hash_md5.hexdigest()
 
 
-def group_files_by_checksum(file_path_names):
+def group_files_by_checksum(file_path_names):  # Waypoint 5
     groups = {}
     for filename in file_path_names:
         checksum = get_file_checksum(filename)
+        if checksum is None:
+            continue  # ignore broken link
         if checksum in groups.keys():
             groups[checksum].append(filename)
         else:
             groups[checksum] = [filename]
-    return list(groups.values())
+    return [group for group in groups.values()
+            if len(group) > 1]  # ignore if group has only 1 file
 
 
-def find_duplicate_files(file_path_names):
+def find_duplicate_files(file_path_names):  # Waypoint 6
     groups_dup_files = []
     groups_by_size = group_files_by_size(file_path_names)
     for gr_by_size in groups_by_size:
@@ -66,5 +78,16 @@ def find_duplicate_files(file_path_names):
         for gr_by_checksum in groups_by_checksum:
             if len(gr_by_checksum) > 1:
                 groups_dup_files.append(gr_by_checksum)
-    return json.dumps(groups_dup_files)
+    return json.dumps(groups_dup_files)  # Waypoint 7
 
+
+def main():
+    args = parse_input()
+    path = args.path
+    file_path_names = scan_files(path)
+    groups_dup_files = find_duplicate_files(file_path_names)
+    print(groups_dup_files)
+
+
+if __name__ == '__main__':
+    main()
