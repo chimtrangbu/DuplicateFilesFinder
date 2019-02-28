@@ -11,9 +11,9 @@ def parse_input():
     parser = argparse.ArgumentParser()
     # Waypoint 1:
     parser.add_argument('-p', '--path', type=str, required=True,
-                         help='accepts one mandatory argument that '
-                              'identifies the root directory to start '
-                              'scanning for duplicate files')
+                        help='accepts one mandatory argument that '
+                             'identifies the root directory to start '
+                             'scanning for duplicate files')
     args = parser.parse_args()
     if not path.isdir(args.path):
         parser.print_help()
@@ -79,6 +79,23 @@ def find_duplicate_files(file_path_names):  # Waypoint 6
             if len(gr_by_checksum) > 1:
                 groups_dup_files.append(gr_by_checksum)
     return json.dumps(groups_dup_files)  # Waypoint 7
+
+
+def compare_files(f1, f2):
+    bufsize = 2048
+    with open(f1, 'rb') as fp1, open(f2, 'rb') as fp2:
+        while True:
+            b1 = fp1.read(bufsize)
+            b2 = fp2.read(bufsize)
+            if b1 != b2:
+                return False
+            if not b1:
+                return True
+
+
+def group_by_comparing(file_path_names):
+    return [(i, j) for i in file_path_names for j in file_path_names if (compare_files(i, j)).all() and i != j]
+
 
 
 def main():
