@@ -2,12 +2,18 @@ from find_duplicate_files import *
 import unittest
 from os import chdir
 from subprocess import getoutput as run
-import requests
-import filecmp
+from requests import get
+from filecmp import cmp
 
 
 def get_file(url, filename=None):
-    response = requests.get(url)
+    """
+    download an online file
+    :param url:
+    :param filename: name to save in local
+    :return:
+    """
+    response = get(url)
     if filename is None:
         filename = url.split('/')[-1]
     with open(filename, 'wb') as f:
@@ -16,10 +22,16 @@ def get_file(url, filename=None):
 
 
 def duplicate_file(filename, nfiles):
+    """
+    copy file
+    :param filename: name of original file
+    :param nfiles: number of new copy-files
+    :return:
+    """
     for i in range(nfiles):
         if '.' in filename:
-            name, type = filename.split('.', -1)
-            run('cp %s %s' % (filename, name + str(i) + '.' + type))
+            name, file_type = filename.split('.', -1)
+            run('cp %s %s' % (filename, name + str(i) + '.' + file_type))
         else:
             run('cp %s %s' % (filename, filename + str(i)))
     return
@@ -74,7 +86,7 @@ class TestFindDup(unittest.TestCase):
         run('rm -rf test/')
 
     def test_scan_files(self):
-        out = str(scan_files('test'))
+        out = str(scan_files('.'))
         self.assertIn("emptyfile'", out)
         self.assertNotIn("symlink2'", out)  # ignore symlinks
         self.assertIn(".emptyhidden'", out)
@@ -85,31 +97,47 @@ class TestFindDup(unittest.TestCase):
         self.assertNotIn("symlink1", out)  # ignore symlinks resolving to dirs
 
     def test_group_files_by_size(self):
-        out = group_files_by_size(scan_files('test'))
+        out = group_files_by_size(scan_files('.'))
         self.assertLess(1, min(map(len, out)))  # each gr has at least 2 files
         for group in out:  # all files in each group have the same size
             self.assertEqual(min(map(path.getsize, group)),
                              max(map(path.getsize, group)))
-        self.assertIn(scan_files('test/a_same_size_gr'), out)  # 1 case
-        self.assertIn([path.abspath('test/samesize_file1'),
-                       path.abspath('test/samesize_file2')],
+        self.assertIn(scan_files('./test/a_same_size_gr'), out)  # 1 case
+        self.assertIn(['./test/samesize_file1', './test/samesize_file2'],
                       out)  # the same size but different content
         self.assertNotIn('empty', str(out))  # ignore empty files
 
     def test_group_files_by_checksum(self):
-        out = group_files_by_checksum(scan_files('test'))
+        out = group_files_by_checksum(scan_files('.'))
         self.assertLess(1, min(map(len, out)))  # each gr has at least 2 files
         for group in out:  # each group are duplicates
             for file in group:
-                self.assertTrue(filecmp.cmp(file, group[0]))
+                self.assertTrue(cmp(file, group[0]))
         self.assertNotIn('samesize', str(out))  # skip same-size but not dup
 
     def test_find_duplicate_files(self):
-        out = json.loads(find_duplicate_files(scan_files('test')))
+        out = find_duplicate_files(scan_files('.'))
         self.assertLess(1, min(map(len, out)))  # each gr has at least 2 files
         for group in out:  # each group are duplicates
             for file in group:
-                self.assertTrue(filecmp.cmp(file, group[0]))
+                self.assertTrue(cmp(file, group[0]))
+        self.assertNotIn('empty', str(out))  # ignore empty files
+        self.assertNotIn('samesize', str(out))  # skip same-size but not dup
+
+    def test_group_files_by_comparing(self):
+        out = group_files_by_comparing(scan_files('.'))
+        self.assertLess(1, min(map(len, out)))  # each gr has at least 2 files
+        for group in out:  # each group are duplicates
+            for file in group:
+                self.assertTrue(cmp(file, group[0]))
+        self.assertNotIn('samesize', str(out))  # skip same-size but not dup
+
+    def test_find_duplicate_files_bonus(self):
+        out = find_duplicate_files(scan_files('.'))
+        self.assertLess(1, min(map(len, out)))  # each gr has at least 2 files
+        for group in out:  # each group are duplicates
+            for file in group:
+                self.assertTrue(cmp(file, group[0]))
         self.assertNotIn('empty', str(out))  # ignore empty files
         self.assertNotIn('samesize', str(out))  # skip same-size but not dup
 
